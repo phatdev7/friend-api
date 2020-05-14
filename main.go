@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"friend-api/cmd"
 )
 
 func main() {
-	fmt.Println("Hello world")
+	cmd.Execute()
 }
