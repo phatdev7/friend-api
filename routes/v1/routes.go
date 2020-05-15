@@ -5,5 +5,6 @@ import (
 )
 
 func Router(r chi.Router) {
-	r.Route("/friend", friendRouter)
+	r.Route("/users", userRouter)
+	r.Route("/friends", friendRouter)
 }

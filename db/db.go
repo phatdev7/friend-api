@@ -4,15 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+
 	_ "github.com/lib/pq"
 )
 
 var (
-	host = "localhost"
-	port = "5432"
-	user = "friend"
+	host     = "localhost"
+	port     = "5432"
+	user     = "friend"
 	password = "p123123"
-	dbname = "friend"
+	dbname   = "friend"
 )
 
 var db *sql.DB
@@ -24,6 +25,10 @@ func GetInstance() *sql.DB {
 func Init() {
 	var err error
 	db, err = sql.Open("postgres", connString())
+	if err != nil {
+		panic(err)
+	}
+	err = db.Ping()
 	if err != nil {
 		panic(err)
 	}

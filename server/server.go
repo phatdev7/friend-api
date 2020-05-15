@@ -26,7 +26,7 @@ func NewServer() *Server {
 }
 
 func (srv *Server) Start() {
-	fmt.Println("Starting server...")
+	fmt.Println("Starting server at port", srv.Addr)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		panic(err)
 	}
