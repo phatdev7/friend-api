@@ -6,5 +6,4 @@ import (
 
 func Router(r chi.Router) {
 	r.Route("/users", userRouter)
-	r.Route("/friends", friendRouter)
 }
