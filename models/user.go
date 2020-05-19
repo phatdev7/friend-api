@@ -5,7 +5,6 @@ import (
 	"friend-api/db"
 	"strings"
 	"sync"
-	"time"
 )
 
 type User struct {
@@ -91,7 +90,6 @@ func GetOneUser(email string) UserResult {
 		}
 	}
 
-	time.Sleep(5 * time.Second)
 	return UserResult{
 		User: &users[0],
 		Err:  nil,
@@ -174,42 +172,16 @@ func (user *User) GetListFriend() FriendListResult {
 }
 
 func GetMutualFriends(emails *Emails) (*FriendList, error) {
-	ch := make(chan UserResult, 2)
-	go func() {
-		var wg sync.WaitGroup
-		wg.Add(3)
-		go func() {
-			ch <- GetOneUser(emails.Emails[0])
-			wg.Done()
-		}()
-		go func() {
-			ch <- GetOneUser(emails.Emails[1])
-			fmt.Println("22")
-			wg.Done()
-		}()
-		go func() {
-			ch <- GetOneUser(emails.Emails[1])
-			fmt.Println("33")
-			wg.Done()
-		}()
-		wg.Wait()
-		close(ch)
-	}()
+	c1 := make(chan UserResult)
+	c2 := make(chan UserResult)
 
-	var userOne, userTwo UserResult
-	userOne = GetOneUser(emails.Emails[0])
-	userTwo = GetOneUser(emails.Emails[1])
-	for v := range ch {
-		fmt.Println(v.User)
-		if emails.Emails[0] == v.User.Email {
-			userOne = v
-		} else {
-			userTwo = v
-		}
-	}
-	fmt.Println(userOne.User.Email)
-	fmt.Printf(userTwo.User.Email)
-	// userOne, userTwo = <-ch, <-ch
+	go func() {
+		c1 <- GetOneUser(emails.Emails[0])
+	}()
+	go func() {
+		c2 <- GetOneUser(emails.Emails[1])
+	}()
+	userOne, userTwo := <-c1, <-c2
 
 	if userOne.Err != nil {
 		return nil, userOne.Err
@@ -265,14 +237,17 @@ func Contains(slice []string, item string) bool {
 }
 
 func SubcribeUser(Requestor string, Target string) error {
-	ch := make(chan UserResult, 2)
+	c1 := make(chan UserResult)
+	c2 := make(chan UserResult)
+
 	go func() {
-		ch <- GetOneUser(Requestor)
+		c1 <- GetOneUser(Requestor)
 	}()
 	go func() {
-		ch <- GetOneUser(Target)
+		c2 <- GetOneUser(Target)
 	}()
-	requestor, target := <-ch, <-ch
+	requestor, target := <-c1, <-c2
+
 	if requestor.Err != nil {
 		return requestor.Err
 	}
@@ -337,15 +312,16 @@ func checkSubcribed(requestor *User, target *User) int {
 }
 
 func BlockUser(Requestor string, Target string) error {
-	ch := make(chan UserResult, 2)
+	c1 := make(chan UserResult)
+	c2 := make(chan UserResult)
 	go func() {
-		ch <- GetOneUser(Requestor)
+		c1 <- GetOneUser(Requestor)
 	}()
 	go func() {
-		ch <- GetOneUser(Target)
+		c2 <- GetOneUser(Target)
 	}()
+	requestor, target := <-c1, <-c2
 
-	requestor, target := <-ch, <-ch
 	if requestor.Err != nil {
 		return requestor.Err
 	}
@@ -406,24 +382,38 @@ func Publish(body *PublishBody) (*PublishRes, error) {
 	if user.Err != nil {
 		return nil, user.Err
 	}
-	friends := user.User.GetListFriend()
+
+	c1 := make(chan FriendListResult)
+	c2 := make(chan SubcribersResult)
+	c3 := make(chan SubcribersResult)
+	go func() {
+		c1 <- user.User.GetListFriend()
+	}()
+	go func() {
+		c2 <- user.User.getSubcribers(1)
+	}()
+	go func() {
+		c3 <- user.User.getSubcribers(0)
+	}()
+	friends, followers, blockers := <-c1, <-c2, <-c3
+
 	if friends.Err != nil {
 		return nil, friends.Err
 	}
-	followers, err := user.User.getSubcribersStatus(1)
-	if err != nil {
-		return nil, err
+	if followers.Err != nil {
+		return nil, followers.Err
 	}
-	blockers, err := user.User.getSubcribersStatus(0)
-	if err != nil {
-		return nil, err
+	if blockers.Err != nil {
+		return nil, blockers.Err
 	}
+
 	combine := make([]string, 0)
 	combine = append(combine, getMention(body.Text)...)
 	combine = append(combine, friends.Data.Friends...)
-	combine = append(combine, *followers...)
+	combine = append(combine, *followers.Emails...)
 	combine = unique(combine)
-	combine = removeEmail(combine, *blockers)
+	combine = removeEmail(combine, *blockers.Emails)
+
 	return &PublishRes{
 		Success:    true,
 		Recipients: combine,
@@ -477,7 +467,12 @@ func getMention(s string) []string {
 	return users
 }
 
-func (user *User) getSubcribersStatus(status int) (*[]string, error) {
+type SubcribersResult struct {
+	Emails *[]string
+	Err    error
+}
+
+func (user *User) getSubcribers(status int) SubcribersResult {
 	q := `
 	SELECT email
 	FROM users
@@ -487,18 +482,27 @@ func (user *User) getSubcribersStatus(status int) (*[]string, error) {
 	`
 	rows, err := db.GetInstance().Query(q, status, user.Email)
 	if err != nil {
-		return nil, err
+		return SubcribersResult{
+			Emails: nil,
+			Err:    err,
+		}
 	}
 	emails := make([]string, 0)
 	for rows.Next() {
 		var email string
 		err := rows.Scan(&email)
 		if err != nil {
-			return nil, err
+			return SubcribersResult{
+				Emails: nil,
+				Err:    err,
+			}
 		}
 		emails = append(emails, email)
 	}
-	return &emails, nil
+	return SubcribersResult{
+		Emails: &emails,
+		Err:    nil,
+	}
 }
 
 type Emails struct {

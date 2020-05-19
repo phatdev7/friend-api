@@ -161,7 +161,9 @@ func getMutualFriends(w http.ResponseWriter, r *http.Request) {
 	var emails models.Emails
 	err := json.NewDecoder(r.Body).Decode(&emails)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
 	}
 	if len(emails.Emails) < 2 || emails.Emails[0] == "" || emails.Emails[1] == "" {
 		w.WriteHeader(400)
