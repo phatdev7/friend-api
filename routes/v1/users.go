@@ -8,7 +8,12 @@ import (
 	"github.com/go-chi/chi"
 )
 
+type TokenV2 struct {
+	TokenString string
+}
+
 func userRouter(r chi.Router) {
+	r.Get("/all", getAll)
 	r.Get("/", getAllUsers)
 	r.Post("/", addUser)
 	r.Post("/subcribe", subcribeUser)
@@ -22,6 +27,19 @@ func userRouter(r chi.Router) {
 			friendRoute.Post("/make", makeFriend)
 		})
 	})
+}
+
+func getAll(w http.ResponseWriter, r *http.Request) {
+	users, err := models.GetAll(r.Context())
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	usersRes, _ := json.Marshal(users)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(200)
+	w.Write([]byte(usersRes))
 }
 
 func getAllUsers(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +111,16 @@ func blockUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(400)
 		w.Write([]byte(err.Error()))
+		return
+	}
+	if body.Requestor == "" || body.Target == "" {
+		w.WriteHeader(400)
+		w.Write([]byte("requestor and target should not be blank!"))
+		return
+	}
+	if body.Requestor == body.Target {
+		w.WriteHeader(400)
+		w.Write([]byte("Both emails cannot be duplicated!"))
 		return
 	}
 	err = models.BlockUser(body.Requestor, body.Target)

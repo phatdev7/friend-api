@@ -1,6 +1,6 @@
 # Refer to https://github.com/volatiletech/sqlboiler#configuration
-pkgname="models"
-output="models"
+pkgname="orm"
+output="models/orm"
 no-tests="true"
 [psql]
   dbname="friend"

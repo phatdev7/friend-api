@@ -1,10 +1,14 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"friend-api/db"
+	"friend-api/models/orm"
 	"strings"
 	"sync"
+
+	"github.com/volatiletech/sqlboiler/queries/qm"
 )
 
 type User struct {
@@ -13,6 +17,38 @@ type User struct {
 }
 
 type Users []User
+
+func GetAll(ctx context.Context) (Users, error) {
+	count, err := orm.Users(qm.Limit(5)).All(ctx, db.GetInstance())
+	fmt.Println(count)
+
+	q := `
+	SELECT u.id, u.email
+	FROM users u
+	`
+	rows, err := db.GetInstance().Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make(Users, 0)
+	for rows.Next() {
+		var id int
+		var email string
+		if err := rows.Scan(&id, &email); err != nil {
+			return users, err
+		}
+		users = append(users, User{
+			ID:    id,
+			Email: email,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
 
 func GetAllUsers() (Users, error) {
 	q := `

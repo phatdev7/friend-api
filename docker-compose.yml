@@ -1,6 +1,14 @@
-version: '3.5'
+version: "3.5"
 
 services:
+  go:
+    container_name: go-friend-local
+    image: golang:1.13
+    links:
+      - html2pdf
+    environment:
+      DATABASE_URL: postgres://friend:p123123@db:5432/friend?sslmode=disable
+
   db:
     ports:
       - "5432:5432"
@@ -25,8 +33,12 @@ services:
     environment:
       DATABASE_URL: postgres://friend:p123123@db:5432/friend?sslmode=disable
 
-
   alpine:
     container_name: alpine-friend-local
     image: alpine
+    restart: "no"
+
+  html2pdf:
+    container_name: http2pdf-friend-local
+    image: arachnysdocker/athenapdf-service
     restart: "no"
